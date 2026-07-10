@@ -6,10 +6,18 @@
 
 ### 准备工作
 
-使用前需要安装依赖：
+使用前需要安装依赖。
 
-```sh
+Python 依赖：
+
+```cmd
 pip install requests mutagen
+```
+
+外部依赖（ffmpeg，用于处理音频）
+
+```cmd
+winget install Gyan.FFmpeg
 ```
 
 ### 使用方法
