@@ -14,7 +14,7 @@ Python 依赖：
 pip install requests mutagen
 ```
 
-外部依赖（ffmpeg，用于处理音频）
+外部依赖（ffmpeg，用于处理音频）：
 
 ```cmd
 winget install Gyan.FFmpeg
