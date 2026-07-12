@@ -142,7 +142,15 @@ def main():
 
     keep_flag = args.keep
 
-    print(f"[INFO] 参数已确认，题目标识为 {exam_unique}，每个音频重复 {repeat_times} 次，间隔 {silence_sec} 秒，保存过程文件：{keep_flag}")
+    ack = (
+        f"[INFO] 输入信息已确认，"
+        f"题目标识为 {exam_unique}，"
+        f"每个音频重复 {repeat_times} 次，"
+        f"间隔 {silence_sec} 秒，"
+        f"保存过程文件：{keep_flag}"
+    )
+
+    print(ack)
 
     # 1. 请求数据
     headers = {
