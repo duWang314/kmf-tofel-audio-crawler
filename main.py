@@ -15,12 +15,15 @@ except ImportError:
     MUTAGEN_AVAILABLE = False
 
 
-def parse_args():
+def get_args_parser():
     parser = argparse.ArgumentParser(description="下载托福音频并合并，支持插入静音与生成对照字幕")
-    parser.add_argument("exam_unique", help="考试唯一标识")
+    parser.add_argument("exam_unique", help="考试（每次练习）唯一标识")
     parser.add_argument("-s", "--silence", type=float, default=0.0,
-                        help="每个音频之间插入的静音秒数（默认 0）")
-    return parser.parse_args()
+                        help="每个音频之间插入的静音秒数，仅接受 0 ~ 20，支持小数（默认 0）")
+    parser.add_argument("-r", "--repeat", type=int, default=3,
+                        help="每个音频重复次数，仅接受 1 ~ 10（默认 3）")
+    parser.add_argument("-k", "--keep", action="store_true", help="保留过程文件")
+    return parser
 
 
 def download_audio(url, filename):
@@ -55,7 +58,7 @@ def get_audio_duration(file_path):
         return float(output)
     except (subprocess.CalledProcessError, FileNotFoundError, ValueError) as e:
         # 降级处理：若获取失败则默认返回一个预估时间（避免程序崩溃）
-        print(f"[WARNING] ffprobe 获取精确时长失败（{e}），将返回一个预估时间")
+        print(f"[WARNING] ffprobe 获取精确时长失败（{e}），将返回一个预设时间：3 秒")
         return 3.0
 
 
@@ -122,9 +125,24 @@ def embed_lyrics_to_mp3(mp3_file, lrc_content):
 
 
 def main():
-    args = parse_args()
+    parser = get_args_parser()
+    args = parser.parse_args()
+
     exam_unique = args.exam_unique
+
     silence_sec = args.silence
+    if silence_sec < 0 or silence_sec > 20:
+        silence_sec = parser.get_default("silence")
+        print(f"[WARNING] 音频间隔超出范围，将选用默认：{silence_sec} 秒")
+
+    repeat_times = args.repeat
+    if repeat_times < 1 or repeat_times > 10:
+        repeat_times = parser.get_default("repeat")
+        print(f"[WARNING] 重复次数超出范围，将选用默认：{repeat_times} 次")
+
+    keep_flag = args.keep
+
+    print(f"[INFO] 参数已确认，题目标识为 {exam_unique}，每个音频重复 {repeat_times} 次，间隔 {silence_sec} 秒，保存过程文件：{keep_flag}")
 
     # 1. 请求数据
     headers = {
@@ -217,11 +235,11 @@ def main():
         dur = get_audio_duration(temp_file)
         script = audioscripts[idx] if idx < len(audioscripts) else ""
 
-        # 重复 3 次（与合并音频的逻辑对齐）
-        for repeat_idx in range(3):
+        # 重复 repeat_times 次（与合并音频的逻辑对齐）
+        for repeat_idx in range(repeat_times):
             # 记录当前段落开始的时间戳并关联文本
             start_stamp = format_lrc_time(current_time)
-            lrc_lines.append(f"{start_stamp}{script} (Rep {repeat_idx + 1}/3)")
+            lrc_lines.append(f"{start_stamp}{script} (Rep {repeat_idx + 1}/{repeat_times})")
             
             # 累加音频时长
             current_time += dur
@@ -238,7 +256,7 @@ def main():
     list_filename = "filelist.txt"
     with open(list_filename, "w", encoding="utf-8") as f:
         for i in range(len(temp_files)):
-            for _ in range(3):
+            for _ in range(repeat_times):
                 f.write(f"file '{i}.mp3'\n")
                 if silence_file:
                     f.write(f"file '{silence_file}'\n")
@@ -278,24 +296,26 @@ def main():
     embed_lyrics_to_mp3(output_filename, lrc_content)
 
     # 9. 清理临时文件
-    for fname in temp_files:
+    if not keep_flag:
+        print("[INFO] 正在清除过程文件(使用 -k 或 --keep 选项以保留)...")
+        for fname in temp_files:
+            try:
+                os.remove(fname)
+            except OSError:
+                pass
+        if silence_file and os.path.exists(silence_file):
+            try:
+                os.remove(silence_file)
+            except OSError:
+                pass
         try:
-            os.remove(fname)
+            os.remove(list_filename)
         except OSError:
             pass
-    if silence_file and os.path.exists(silence_file):
         try:
-            os.remove(silence_file)
+            os.remove(lrc_filename)
         except OSError:
             pass
-    try:
-        os.remove(list_filename)
-    except OSError:
-        pass
-    try:
-        os.remove(lrc_filename)
-    except OSError:
-        pass
 
     print("[INFO] 完成！")
 
