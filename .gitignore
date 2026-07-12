@@ -1,4 +1,4 @@
-*
-!.gitignore
-!main.py
-!README.md
+/test/
+/*.mp3
+/*.lrc
+/*.txt
