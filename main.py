@@ -207,7 +207,9 @@ def main():
         print("[ERROR] 没有找到任何音频 URL")
         sys.exit(1)
 
-    print(f"[INFO] 共找到 {len(audio_urls)} 个音频文件")
+    url_count, script_count = len(audio_urls), len(audioscripts)
+    print(f"[INFO] 共找到 {url_count} 个音频文件")
+    print(f"[INFO] 共找到 {script_count} 个字幕文件")
 
     # 3. 下载音频，命名为 0.mp3, 1.mp3, ...
     temp_files = []
@@ -233,30 +235,38 @@ def main():
         if not generate_silence_mp3(silence_sec, silence_file):
             sys.exit(1)
 
-    # 5. 精确计算时间线并生成 LRC 歌词内容
-    print("[INFO] 正在计算音频时间线并生成歌词...")
+    # 5. 生成 LRC 歌词内容（如果匹配则精确计算时间线，否则直接生嵌）
     lrc_lines = []
     current_time = 0.0
+    if script_count == url_count:
+        print("[INFO] 正在计算音频时间线并生成歌词...")
+        for idx, temp_file in enumerate(temp_files):
+            # 获取当前音频的精确时长
+            dur = get_audio_duration(temp_file)
+            script = audioscripts[idx] if idx < len(audioscripts) else ""
 
-    for idx, temp_file in enumerate(temp_files):
-        # 获取当前音频的精确时长
-        dur = get_audio_duration(temp_file)
-        script = audioscripts[idx] if idx < len(audioscripts) else ""
+            # 重复 repeat_times 次（与合并音频的逻辑对齐）
+            for repeat_idx in range(repeat_times):
+                # 记录当前段落开始的时间戳并关联文本
+                start_stamp = format_lrc_time(current_time)
+                lrc_lines.append(f"{start_stamp}{script} (Rep {repeat_idx + 1}/{repeat_times})")
 
-        # 重复 repeat_times 次（与合并音频的逻辑对齐）
-        for repeat_idx in range(repeat_times):
-            # 记录当前段落开始的时间戳并关联文本
+                # 累加音频时长
+                current_time += dur
+
+                # 如果设置了静音秒数，则在静音期间插入一条空提示，防止上一句歌词一直停留在屏幕上
+                if silence_sec > 0:
+                    silence_stamp = format_lrc_time(current_time)
+                    lrc_lines.append(f"{silence_stamp}[Silence Interval]")
+                    current_time += silence_sec
+    
+    else:
+        print("[WARNING] 由于听力原文数目不为预期，嵌入时歌词之间的间隔将设为默认的 1 秒...")
+        for i in range(script_count):
             start_stamp = format_lrc_time(current_time)
-            lrc_lines.append(f"{start_stamp}{script} (Rep {repeat_idx + 1}/{repeat_times})")
-            
-            # 累加音频时长
-            current_time += dur
-
-            # 如果设置了静音秒数，则在静音期间插入一条空提示，防止上一句歌词一直停留在屏幕上
-            if silence_sec > 0:
-                silence_stamp = format_lrc_time(current_time)
-                lrc_lines.append(f"{silence_stamp}[Silence Interval]")
-                current_time += silence_sec
+            script = audioscripts[i]
+            lrc_lines.append(f"{start_stamp}{script}")
+            current_time += 1
 
     lrc_content = "\n".join(lrc_lines)
 
