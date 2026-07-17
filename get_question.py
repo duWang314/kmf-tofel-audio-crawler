@@ -1,7 +1,8 @@
 import requests
-import json
+import sys
 import argparse
 
+from main import clean_html
 
 parser = argparse.ArgumentParser(description="测试程序")
 parser.add_argument("exam_unique", help="考试唯一标识")
@@ -28,7 +29,6 @@ headers = {
 }
 url = "https://api.kmf.com/toefl-app/practice/report"
 
-exam_unique = args.exam_unique
 params = {"exam_unique": exam_unique}
 
 try:
@@ -43,11 +43,9 @@ except requests.RequestException as e:
 questions = data.get("result", {}).get("questions", {})
 audioscripts = []
 for qid, qdata in questions.items():
-    audioscript = qdata.get("question").get("html_content")
-    if audioscript:
-        audioscripts.append(audioscript)
-
-# 清洗 html 标记
+    html_content = qdata.get("question", {}).get("html_content")
+    if html_content:
+        audioscripts.append(clean_html(html_content))
 
 # 导出 txt 文件
 txt_lines = []
@@ -59,7 +57,7 @@ for i in range(script_count):
 
 txt_content = "\n\n".join(txt_lines)
 
-txt_filename = f"{exam_unique}.txt"
+txt_filename = f"{exam_unique} - 题目.txt"
 with open(txt_filename, "w", encoding="utf-8") as f:
     f.write(txt_content)
 print(f"[INFO] 已生成题目文件: {txt_filename}")
